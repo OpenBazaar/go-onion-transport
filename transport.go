@@ -53,7 +53,7 @@ type OnionTransport struct {
 
 // NewOnionTransport creates a OnionTransport
 // If key is nil then generate a new key.
-func NewOnionTransport(controlNet, controlAddr string, port uint16, key crypto.PrivateKey, auth *proxy.Auth) (*OnionTransport, error) {
+func NewOnionTransport(controlNet, controlAddr string, key crypto.PrivateKey, auth *proxy.Auth) (*OnionTransport, error) {
 	conn, err := bulb.Dial(controlNet, controlAddr)
 	if err != nil {
 		return nil, err
@@ -61,8 +61,8 @@ func NewOnionTransport(controlNet, controlAddr string, port uint16, key crypto.P
 	o := OnionTransport{
 		controlConn: conn,
 		auth:        auth,
-		port:        port,
 		key:         key,
+		laddr:       ma.Multiaddr,
 	}
 	return &o, nil
 }
@@ -76,11 +76,32 @@ func (t *OnionTransport) Dialer(laddr ma.Multiaddr, opts ...tpt.DialOpt) (tpt.Di
 	return dialer, nil
 }
 
-func (t *OnionTransport) Listen(a ma.Multiaddr) (tpt.Listener, error) {
-	listener := OnionListener{
-		port: t.port,
-		key:  t.key,
+func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
+	// convert to net.Addr
+	netaddr, err := manet.ToNetAddr(laddr)
+	if err != nil {
+		return nil, err
 	}
+
+	// retreive onion service virtport
+	addr := strings.Split(netaddr.String(), ":")
+	if len(addr) != 2 {
+		return nil, fmt.Errorf("failed to parse onion address")
+	}
+	t.port = addr[1]
+
+	listener := OnionListener{
+		port:  t.port,
+		key:   t.key,
+		laddr: laddr,
+	}
+
+	// setup bulb listener
+	listener.listener, err = t.controlConn.Listen(t.port, t.key)
+	if err != nil {
+		return nil, err
+	}
+
 	return listener, nil
 }
 
@@ -123,21 +144,35 @@ func (d *OnionDialer) Matches(a ma.Multiaddr) bool {
 
 // OnionListener implements go-libp2p-transport's Listener interface
 type OnionListener struct {
-	port uint16
-	key  crypto.PrivateKey
+	port     uint16
+	key      crypto.PrivateKey
+	laddr    ma.Multiaddr
+	listener net.Listener
 }
 
 func (l *OnionListener) Accept() (tpt.Conn, error) {
-
+	conn, err := l.listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	onionConn := OnionConn{
+		conn:      conn,
+		transport: l.transport,
+	}
+	return onionConn, nil
 }
 
 func (l *OnionListener) Close() error {
 }
 
 func (l *OnionListener) Addr() net.Addr {
+	netaddr, err := manet.ToNetAddr(a)
+	// XXX if err != nil { ...
+	return netaddr
 }
 
 func (l *OnionListener) Multiaddr() ma.Multiaddr {
+	return l.laddr
 }
 
 // OnionConn implement's go-libp2p-transport's Conn interface
