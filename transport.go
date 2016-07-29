@@ -6,9 +6,42 @@ import (
 
 	tpt "github.com/ipfs/go-libp2p-transport"
 	ma "github.com/jbenet/go-multiaddr"
+	manet "github.com/jbenet/go-multiaddr-net"
+
 	"github.com/yawning/bulb"
 	"golang.org/x/net/proxy"
 )
+
+func IsValidOnionMultiAddr(a ma.Multiaddr) bool {
+	netaddr, err := manet.ToNetAddr(a)
+	if err != nil {
+		return false
+	}
+	addr := strings.Split(netaddr.String(), ":")
+	if len(addr) != 2 {
+		return false
+	}
+
+	// onion address without the ".onion" substring
+	if len(addr[0]) != 16 {
+		return false
+	}
+	onionHostBytes, err := base32.StdEncoding.DecodeString(strings.ToUpper(addr[0]))
+	if err != nil {
+		return false
+	}
+
+	// onion port number
+	i, err := strconv.Atoi(addr[1])
+	if err != nil {
+		return false
+	}
+	if i >= 65536 || i < 1 {
+		return false
+	}
+
+	return true
+}
 
 // OnionTransport implements go-libp2p-transport's Transport interface
 type OnionTransport struct {
@@ -34,9 +67,11 @@ func NewOnionTransport(controlNet, controlAddr string, port uint16, key crypto.P
 	return &o, nil
 }
 
-func (t *OnionTransport) Dialer(_ ma.Multiaddr, opts ...tpt.DialOpt) (tpt.Dialer, error) {
+func (t *OnionTransport) Dialer(laddr ma.Multiaddr, opts ...tpt.DialOpt) (tpt.Dialer, error) {
 	dialer := OnionDialer{
-		auth: t.auth,
+		auth:      t.auth,
+		laddr:     &laddr,
+		transport: t,
 	}
 	return dialer, nil
 }
@@ -50,26 +85,40 @@ func (t *OnionTransport) Listen(a ma.Multiaddr) (tpt.Listener, error) {
 }
 
 func (t *OnionTransport) Matches(a ma.Multiaddr) bool {
-	// XXX fix me
-	return true
+	return IsValidOnionMultiAddr(a)
 }
 
 // OnionDialer implements go-libp2p-transport's Dialer interface
 type OnionDialer struct {
-	auth *proxy.Auth
+	auth      *proxy.Auth
+	conn      *OnionConn
+	laddr     *ma.Multiaddr
+	transport *OnionTransport
 }
 
-func (d *OnionDialer) Dial() (tpt.Conn, error) {
+func (d *OnionDialer) Dial(raddr ma.Multiaddr) (tpt.Conn, error) {
 	dialer, err := bulb.Dialer(d.auth)
 	if err != nil {
 		return nil, err
 	}
-	dialer
+	netaddr, err := manet.ToNetAddr(raddr)
+	if err != nil {
+		return nil, err
+	}
+	onionConn := OnionConn{
+		transport: d.transport,
+		laddr:     d.laddr,
+		raddr:     raddr,
+	}
+	onionConn.conn, err = dialer.Dial(netaddr.Network(), netaddr.String())
+	if err != nil {
+		return nil, err
+	}
+	return onionConn, nil
 }
 
 func (d *OnionDialer) Matches(a ma.Multiaddr) bool {
-	// XXX fix me
-	return true
+	return IsValidOnionMultiAddr(a)
 }
 
 // OnionListener implements go-libp2p-transport's Listener interface
@@ -79,6 +128,7 @@ type OnionListener struct {
 }
 
 func (l *OnionListener) Accept() (tpt.Conn, error) {
+
 }
 
 func (l *OnionListener) Close() error {
@@ -93,15 +143,19 @@ func (l *OnionListener) Multiaddr() ma.Multiaddr {
 // OnionConn implement's go-libp2p-transport's Conn interface
 type OnionConn struct {
 	transport *OnionTransport
-	conn      *bulb.Conn
+	conn      net.Conn
+	laddr     *ma.Multiaddr
+	raddr     *ma.Multiaddr
 }
 
-func (c *OnionConn) Transport() {
+func (c *OnionConn) Transport() *OnionTransport {
 	return c.transport
 }
 
 func (c *OnionConn) LocalMultiaddr() ma.Multiaddr {
+	return *c.laddr
 }
 
 func (c *OnionConn) RemoteMultiaddr() ma.Multiaddr {
+	return *c.raddr
 }
