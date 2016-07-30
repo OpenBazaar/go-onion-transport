@@ -18,8 +18,10 @@ func IsValidOnionMultiAddr(a ma.Multiaddr) bool {
 		return false
 	}
 
-	// XXX todo: check for correct network type
-	// if netaddr.Network() == "onion"
+	// check for correct network type
+	if netaddr.Network() != "onion" {
+		return false
+	}
 
 	// split into onion address and port
 	addr := strings.Split(netaddr.String(), ":")
