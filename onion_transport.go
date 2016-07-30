@@ -91,6 +91,15 @@ func (t *OnionTransport) Dialer(laddr ma.Multiaddr, opts ...tpt.DialOpt) (tpt.Di
 }
 
 // Listen creates and returns a go-libp2p-transport Listener
+//
+// XXX NOTE: Here we only use the port number of the given multiaddr because
+// our OnionTransport will be created with a single key or no key in which
+// case our new onion service key material will be automatically generated.
+//
+// This points to an impedence mismatch between the go-libp2p-transport
+// and the Tor onion service APIs; The onion service key material is needed
+// to create the onion listener whereas to connect to the onion service only
+// the onion address and port are needed.
 func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	// convert to net.Addr
 	netaddr, err := manet.ToNetAddr(laddr)
