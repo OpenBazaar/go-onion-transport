@@ -163,11 +163,11 @@ func (l *OnionListener) Accept() (tpt.Conn, error) {
 }
 
 func (l *OnionListener) Close() error {
+	return l.listener.Close()
 }
 
 func (l *OnionListener) Addr() net.Addr {
-	netaddr, err := manet.ToNetAddr(a)
-	// XXX if err != nil { ...
+	netaddr, _ := manet.ToNetAddr(l.laddr)
 	return netaddr
 }
 
