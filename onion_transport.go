@@ -17,6 +17,11 @@ func IsValidOnionMultiAddr(a ma.Multiaddr) bool {
 	if err != nil {
 		return false
 	}
+
+	// XXX todo: check for correct network type
+	// if netaddr.Network() == "onion"
+
+	// split into onion address and port
 	addr := strings.Split(netaddr.String(), ":")
 	if len(addr) != 2 {
 		return false
@@ -47,7 +52,6 @@ func IsValidOnionMultiAddr(a ma.Multiaddr) bool {
 type OnionTransport struct {
 	controlConn *bulb.Conn
 	auth        *proxy.Auth
-	port        uint16
 	key         crypto.PrivateKey
 }
 
@@ -88,16 +92,21 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	if len(addr) != 2 {
 		return nil, fmt.Errorf("failed to parse onion address")
 	}
-	t.port = addr[1]
+
+	// convert port string to int
+	port, err := strconv.Atoi(addr[1])
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert onion service port to int")
+	}
 
 	listener := OnionListener{
-		port:  t.port,
+		port:  port,
 		key:   t.key,
 		laddr: laddr,
 	}
 
 	// setup bulb listener
-	listener.listener, err = t.controlConn.Listen(t.port, t.key)
+	listener.listener, err = t.controlConn.Listen(port, t.key)
 	if err != nil {
 		return nil, err
 	}
