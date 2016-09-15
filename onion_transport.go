@@ -98,12 +98,15 @@ func loadKeys() (map[string]crypto.PrivateKey, error) {
 		if strings.HasSuffix(path, ".onion_key") {
 			file, err := os.Open(path)
 			if err != nil {
-				return keys, err
+				return nil, err
 			}
 			key := make([]byte, 825)
-			_, err := file.Read(data)
+			n, err := file.ReadFull(data)
 			if err != nil {
-				return keys, err
+				return nil, err
+			}
+			if n > 825 || n < 820 {
+				return nil, fmt.Errorf("Wrong size key-blob")
 			}
 			_, file := filepath.Split(path)
 			onionName := strings.Replace(file, ".onion_key", "", 1)
@@ -113,7 +116,7 @@ func loadKeys() (map[string]crypto.PrivateKey, error) {
 	}
 	err = filepath.Walk(absPath, walkpath)
 	if err != nil {
-		return keys, err
+		return nil, err
 	}
 }
 
