@@ -77,14 +77,19 @@ func NewOnionTransport(controlNet, controlAddr string, auth *proxy.Auth, keysDir
 		controlConn: conn,
 		auth:        auth,
 		keysDir:     keysDir,
-		keys:        make(map[string]crypto.PrivateKey),
 		laddr:       ma.Multiaddr,
 	}
+	keys, err := loadKeys()
+	if err != nil {
+		return nil, err
+	}
+	o.keys = keys
 	return &o, nil
 }
 
-// LoadKeys loads keys into our keys map from files in the keys directory
-func (t *OnionTransport) LoadKeys() error {
+// loadKeys loads keys into our keys map from files in the keys directory
+func loadKeys() (map[string]crypto.PrivateKey, error) {
+	keys := make(map[string]crypto.PrivateKey)
 	absPath, err := filepath.Abs(t.keysDir)
 	if err != nil {
 		return err
@@ -93,22 +98,22 @@ func (t *OnionTransport) LoadKeys() error {
 		if strings.HasSuffix(path, ".onion_key") {
 			file, err := os.Open(path)
 			if err != nil {
-				return err
+				return keys, err
 			}
 			key := make([]byte, 825)
 			_, err := file.Read(data)
 			if err != nil {
-				return nil
+				return keys, err
 			}
 			_, file := filepath.Split(path)
 			onionName := strings.Replace(file, ".onion_key", "", 1)
-			t.keys[onionName] = key
+			keys[onionName] = key
 		}
-		return nil
+		return keys, nil
 	}
 	err = filepath.Walk(absPath, walkpath)
 	if err != nil {
-		return err
+		return keys, err
 	}
 }
 
