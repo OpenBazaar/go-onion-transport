@@ -2,6 +2,7 @@ package torOnion
 
 import (
 	"crypto"
+	"fmt"
 	"net"
 
 	tpt "github.com/ipfs/go-libp2p-transport"
@@ -56,7 +57,8 @@ func IsValidOnionMultiAddr(a ma.Multiaddr) bool {
 type OnionTransport struct {
 	controlConn *bulb.Conn
 	auth        *proxy.Auth
-	key         crypto.PrivateKey
+	keysDir     string
+	keys        map[string]crypto.PrivateKey
 }
 
 // NewOnionTransport creates a OnionTransport
@@ -64,9 +66,9 @@ type OnionTransport struct {
 // controlNet and controlAddr contain the connecting information
 // for the tor control port; either TCP or UNIX domain socket.
 //
-// key is the key material for the Tor onion service.
+// keysDir is the key material for the Tor onion service.
 // If key is nil then generate a new key; it will not be persisted upon shutdown.
-func NewOnionTransport(controlNet, controlAddr string, key crypto.PrivateKey, auth *proxy.Auth) (*OnionTransport, error) {
+func NewOnionTransport(controlNet, controlAddr string, auth *proxy.Auth, keysDir string) (*OnionTransport, error) {
 	conn, err := bulb.Dial(controlNet, controlAddr)
 	if err != nil {
 		return nil, err
@@ -74,10 +76,40 @@ func NewOnionTransport(controlNet, controlAddr string, key crypto.PrivateKey, au
 	o := OnionTransport{
 		controlConn: conn,
 		auth:        auth,
-		key:         key,
+		keysDir:     keysDir,
+		keys:        make(map[string]crypto.PrivateKey),
 		laddr:       ma.Multiaddr,
 	}
 	return &o, nil
+}
+
+// LoadKeys loads keys into our keys map from files in the keys directory
+func (t *OnionTransport) LoadKeys() error {
+	absPath, err := filepath.Abs(t.keysDir)
+	if err != nil {
+		return err
+	}
+	walkpath := func(path string, f os.FileInfo, err error) error {
+		if strings.HasSuffix(path, ".onion_key") {
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			key := make([]byte, 825)
+			_, err := file.Read(data)
+			if err != nil {
+				return nil
+			}
+			_, file := filepath.Split(path)
+			onionName := strings.Replace(file, ".onion_key", "", 1)
+			t.keys[onionName] = key
+		}
+		return nil
+	}
+	err = filepath.Walk(absPath, walkpath)
+	if err != nil {
+		return err
+	}
 }
 
 // Dialer creates and returns a go-libp2p-transport Dialer
@@ -91,16 +123,8 @@ func (t *OnionTransport) Dialer(laddr ma.Multiaddr, opts ...tpt.DialOpt) (tpt.Di
 }
 
 // Listen creates and returns a go-libp2p-transport Listener
-//
-// XXX NOTE: Here we only use the port number of the given multiaddr because
-// our OnionTransport will be created with a single key or no key in which
-// case our new onion service key material will be automatically generated.
-//
-// This points to an impedence mismatch between the go-libp2p-transport
-// and the Tor onion service APIs; The onion service key material is needed
-// to create the onion listener whereas to connect to the onion service only
-// the onion address and port are needed.
 func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
+
 	// convert to net.Addr
 	netaddr, err := manet.ToNetAddr(laddr)
 	if err != nil {
@@ -119,14 +143,19 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 		return nil, fmt.Errorf("failed to convert onion service port to int")
 	}
 
+	onionKey, ok := t.keys[addr[0]]
+	if !ok {
+		return nil, fmt.Errorf("missing onion service key material for %s", addr[0])
+	}
+
 	listener := OnionListener{
 		port:  port,
-		key:   t.key,
+		key:   onionKey,
 		laddr: laddr,
 	}
 
 	// setup bulb listener
-	listener.listener, err = t.controlConn.Listen(port, t.key)
+	listener.listener, err = t.controlConn.Listen(port, onionKey)
 	if err != nil {
 		return nil, err
 	}
