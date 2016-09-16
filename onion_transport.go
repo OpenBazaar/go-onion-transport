@@ -11,6 +11,11 @@ import (
 
 	"github.com/yawning/bulb"
 	"golang.org/x/net/proxy"
+	"strings"
+	"strconv"
+	"path/filepath"
+	"os"
+	"encoding/base32"
 )
 
 // IsValidOnionMultiAddr is used to validate that a multiaddr
@@ -36,7 +41,7 @@ func IsValidOnionMultiAddr(a ma.Multiaddr) bool {
 	if len(addr[0]) != 16 {
 		return false
 	}
-	onionHostBytes, err := base32.StdEncoding.DecodeString(strings.ToUpper(addr[0]))
+	_, err = base32.StdEncoding.DecodeString(strings.ToUpper(addr[0]))
 	if err != nil {
 		return false
 	}
@@ -77,9 +82,8 @@ func NewOnionTransport(controlNet, controlAddr string, auth *proxy.Auth, keysDir
 		controlConn: conn,
 		auth:        auth,
 		keysDir:     keysDir,
-		laddr:       ma.Multiaddr,
 	}
-	keys, err := loadKeys()
+	keys, err := o.loadKeys()
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +92,7 @@ func NewOnionTransport(controlNet, controlAddr string, auth *proxy.Auth, keysDir
 }
 
 // loadKeys loads keys into our keys map from files in the keys directory
-func loadKeys() (map[string]crypto.PrivateKey, error) {
+func (t *OnionTransport) loadKeys() (map[string]crypto.PrivateKey, error) {
 	keys := make(map[string]crypto.PrivateKey)
 	absPath, err := filepath.Abs(t.keysDir)
 	if err != nil {
@@ -100,24 +104,18 @@ func loadKeys() (map[string]crypto.PrivateKey, error) {
 			if err != nil {
 				return nil, err
 			}
-			key := make([]byte, 825)
-			n, err := file.ReadFull(data)
+			var key []byte
+			_, err = file.Read(key)
 			if err != nil {
 				return nil, err
 			}
-			if n > 825 || n < 820 {
-				return nil, fmt.Errorf("Wrong size key-blob")
-			}
-			_, file := filepath.Split(path)
-			onionName := strings.Replace(file, ".onion_key", "", 1)
+			onionName := strings.Replace(file.Name(), ".onion_key", "", 1)
 			keys[onionName] = key
 		}
 		return keys, nil
 	}
 	err = filepath.Walk(absPath, walkpath)
-	if err != nil {
-		return nil, err
-	}
+	return nil, err
 }
 
 // Dialer creates and returns a go-libp2p-transport Dialer
@@ -163,7 +161,7 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	}
 
 	// setup bulb listener
-	listener.listener, err = t.controlConn.Listen(port, onionKey)
+	listener.listener, err = t.controlConn.Listener(port, onionKey)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +185,7 @@ type OnionDialer struct {
 // Dial connects to the specified multiaddr and returns
 // a go-libp2p-transport Conn interface
 func (d *OnionDialer) Dial(raddr ma.Multiaddr) (tpt.Conn, error) {
-	dialer, err := bulb.Dialer(d.auth)
+	dialer, err := d.transport.controlConn.Dialer(d.auth)
 	if err != nil {
 		return nil, err
 	}
@@ -214,10 +212,11 @@ func (d *OnionDialer) Matches(a ma.Multiaddr) bool {
 
 // OnionListener implements go-libp2p-transport's Listener interface
 type OnionListener struct {
-	port     uint16
-	key      crypto.PrivateKey
-	laddr    ma.Multiaddr
-	listener net.Listener
+	port      uint16
+	key       crypto.PrivateKey
+	laddr     ma.Multiaddr
+	listener  net.Listener
+	transport *OnionTransport
 }
 
 // Accept blocks until a connection is received returning
@@ -231,6 +230,8 @@ func (l *OnionListener) Accept() (tpt.Conn, error) {
 	onionConn := OnionConn{
 		conn:      conn,
 		transport: l.transport,
+		laddr:     l.laddr,
+		raddr:     conn.RemoteAddr(),
 	}
 	return onionConn, nil
 }
