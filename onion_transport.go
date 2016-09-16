@@ -6,8 +6,8 @@ import (
 	"net"
 
 	tpt "github.com/ipfs/go-libp2p-transport"
-	ma "github.com/jbenet/go-multiaddr"
-	manet "github.com/jbenet/go-multiaddr-net"
+	manet "gx/ipfs/QmPpRcbNUXauP3zWZ1NJMLWpe4QnmEHrd2ba2D3yqWznw7/go-multiaddr-net"
+	ma "gx/ipfs/QmYzDkkgAEmrcNzFCiYo6L1dTX4EAG1gZkbtdbd9trL4vd/go-multiaddr"
 
 	"github.com/yawning/bulb"
 	"golang.org/x/net/proxy"
