@@ -2,7 +2,7 @@ package torOnion
 
 import (
 	"testing"
-	ma "gx/ipfs/QmUAQaWbKxGCUTuoQVvvicbQNZ9APF5pDGWyAZSe93AtKH/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
 	"crypto/rsa"
 	"github.com/yawning/bulb/utils/pkcs1"
 	"os"
