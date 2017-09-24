@@ -210,8 +210,7 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	return &listener, nil
 }
 
-// Matches returns true if onlyOnion and the given multiaddr represents a Tor onion service otherwise it checks
-// for onion, TCP, and WS.
+// Matches returns true if the address is a valid onion multiaddr
 func (t *OnionTransport) Matches(a ma.Multiaddr) bool {
 	return IsValidOnionMultiAddr(a)
 }
