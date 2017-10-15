@@ -50,26 +50,6 @@ func TestIsValidOnionMultiAddr(t *testing.T) {
 	}
 }
 
-func Test_loadKeys(t *testing.T) {
-	tpt := &OnionTransport{keysDir:"./"}
-	keys, err := tpt.loadKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	tpt.keys = keys
-	k, ok := tpt.keys[key]
-	if !ok {
-		t.Fatal("Failed to correctly load keys")
-	}
-	id, err := pkcs1.OnionAddr(&k.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != key {
-		t.Fatal("Failed to correctly load keys")
-	}
-}
-
 func createHiddenServiceKey() (string, error){
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
