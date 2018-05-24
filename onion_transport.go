@@ -81,20 +81,18 @@ type OnionTransport struct {
 // controlNet and controlAddr contain the connecting information
 // for the tor control port; either TCP or UNIX domain socket.
 //
-// auth contains the optional tor control password
+// controlPass contains the optional tor control password
+//
+// auth contains the socks proxy username and password
 // keysDir is the key material for the Tor onion service.
 //
 // if onlyOnion is true the dialer will only be used to dial out on onion addresses
-func NewOnionTransport(controlNet, controlAddr string, auth *proxy.Auth, keysDir string, onlyOnion bool) (*OnionTransport, error) {
+func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.Auth, keysDir string, onlyOnion bool) (*OnionTransport, error) {
 	conn, err := bulb.Dial(controlNet, controlAddr)
 	if err != nil {
 		return nil, err
 	}
-	var pw string
-	if auth != nil {
-		pw = auth.Password
-	}
-	if err := conn.Authenticate(pw); err != nil {
+	if err := conn.Authenticate(controlPass); err != nil {
 		return nil, fmt.Errorf("Authentication failed: %v", err)
 	}
 	o := OnionTransport{
