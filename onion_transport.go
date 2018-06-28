@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"net"
 
+	peer "github.com/libp2p/go-libp2p-peer"
+	tpt "github.com/libp2p/go-libp2p-transport"
+	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
-	tpt "github.com/libp2p/go-libp2p-transport"
 	mafmt "github.com/whyrusleeping/mafmt"
+	"github.com/yawning/bulb"
+	"github.com/yawning/bulb/utils/pkcs1"
+	"golang.org/x/net/proxy"
 
 	"context"
 	"crypto/rsa"
 	"encoding/base32"
 	"encoding/pem"
-	"github.com/yawning/bulb"
-	"github.com/yawning/bulb/utils/pkcs1"
-	"golang.org/x/net/proxy"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -74,6 +76,44 @@ type OnionTransport struct {
 	keysDir     string
 	keys        map[string]*rsa.PrivateKey
 	onlyOnion   bool
+	upgrader    *tptu.Upgrader
+}
+
+// Dial initializes a new connection to a peer at a given address
+func (t *OnionTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (tpt.Conn, error) {
+	dialer := OnionDialer{
+		auth:      t.auth,
+		transport: t,
+	}
+	conn, err := dialer.Dial(raddr)
+	if err != nil {
+		return nil, err
+	}
+	return t.upgrader.UpgradeOutbound(ctx, t, conn, p)
+}
+
+// CanDial determines whether or not the transport can dial a given address
+func (t *OnionTransport) CanDial(addr ma.Multiaddr) bool {
+	if t.onlyOnion {
+		// only dial out on onion addresses
+		return IsValidOnionMultiAddr(addr)
+	}
+	return IsValidOnionMultiAddr(addr) || mafmt.TCP.Matches(addr)
+}
+
+// Protocols returns only the Onion protocol if onlyOnion is true, otherwise
+// it returns Onion and TCP.
+func (t *OnionTransport) Protocols() []int {
+	protocols := []int{ma.P_ONION}
+	if !t.onlyOnion {
+		protocols = append(protocols, ma.P_TCP)
+	}
+	return protocols
+}
+
+// Proxy returns true, for tor is a relay-based protocol.
+func (t *OnionTransport) Proxy() bool {
+	return true
 }
 
 // NewOnionTransport creates a OnionTransport
@@ -87,7 +127,7 @@ type OnionTransport struct {
 // keysDir is the key material for the Tor onion service.
 //
 // if onlyOnion is true the dialer will only be used to dial out on onion addresses
-func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.Auth, keysDir string, onlyOnion bool) (*OnionTransport, error) {
+func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.Auth, keysDir string, upgrader *tptu.Upgrader, onlyOnion bool) (*OnionTransport, error) {
 	conn, err := bulb.Dial(controlNet, controlAddr)
 	if err != nil {
 		return nil, err
@@ -100,6 +140,7 @@ func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.
 		auth:        auth,
 		keysDir:     keysDir,
 		onlyOnion:   onlyOnion,
+		upgrader:    upgrader,
 	}
 	keys, err := o.loadKeys()
 	if err != nil {
@@ -109,7 +150,7 @@ func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.
 	return &o, nil
 }
 
-// Returns a proxy dialer gathered from the control interface.
+// TorDialer returns a proxy dialer gathered from the control interface.
 // This isn't needed for the IPFS transport but it provides
 // easy access to Tor for other functions.
 func (t *OnionTransport) TorDialer() (proxy.Dialer, error) {
@@ -151,16 +192,6 @@ func (t *OnionTransport) loadKeys() (map[string]*rsa.PrivateKey, error) {
 	}
 	err = filepath.Walk(absPath, walkpath)
 	return keys, err
-}
-
-// Dialer creates and returns a go-libp2p-transport Dialer
-func (t *OnionTransport) Dialer(laddr ma.Multiaddr, opts ...tpt.DialOpt) (tpt.Dialer, error) {
-	dialer := OnionDialer{
-		auth:      t.auth,
-		laddr:     &laddr,
-		transport: t,
-	}
-	return &dialer, nil
 }
 
 // Listen creates and returns a go-libp2p-transport Listener
@@ -205,7 +236,7 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 		return nil, err
 	}
 
-	return &listener, nil
+	return t.upgrader.UpgradeListener(t, listener), nil
 }
 
 // Matches returns true if the address is a valid onion multiaddr
@@ -217,13 +248,12 @@ func (t *OnionTransport) Matches(a ma.Multiaddr) bool {
 type OnionDialer struct {
 	auth      *proxy.Auth
 	conn      *OnionConn
-	laddr     *ma.Multiaddr
 	transport *OnionTransport
 }
 
 // Dial connects to the specified multiaddr and returns
 // a go-libp2p-transport Conn interface
-func (d *OnionDialer) Dial(raddr ma.Multiaddr) (tpt.Conn, error) {
+func (d *OnionDialer) Dial(raddr ma.Multiaddr) (manet.Conn, error) {
 	dialer, err := d.transport.controlConn.Dialer(d.auth)
 	if err != nil {
 		return nil, err
@@ -238,7 +268,6 @@ func (d *OnionDialer) Dial(raddr ma.Multiaddr) (tpt.Conn, error) {
 	}
 	onionConn := OnionConn{
 		transport: tpt.Transport(d.transport),
-		laddr:     d.laddr,
 		raddr:     &raddr,
 	}
 	if onionAddress != "" {
@@ -251,10 +280,6 @@ func (d *OnionDialer) Dial(raddr ma.Multiaddr) (tpt.Conn, error) {
 		return nil, err
 	}
 	return &onionConn, nil
-}
-
-func (d *OnionDialer) DialContext(ctx context.Context, raddr ma.Multiaddr) (tpt.Conn, error) {
-	return d.Dial(raddr)
 }
 
 // If onlyOnion is set, Matches returns true only for onion addrs.
@@ -280,7 +305,7 @@ type OnionListener struct {
 // Accept blocks until a connection is received returning
 // go-libp2p-transport's Conn interface or an error if
 // something went wrong
-func (l *OnionListener) Accept() (tpt.Conn, error) {
+func (l OnionListener) Accept() (manet.Conn, error) {
 	conn, err := l.listener.Accept()
 	if err != nil {
 		return nil, err
@@ -299,19 +324,19 @@ func (l *OnionListener) Accept() (tpt.Conn, error) {
 }
 
 // Close shuts down the listener
-func (l *OnionListener) Close() error {
+func (l OnionListener) Close() error {
 	return l.listener.Close()
 }
 
 // Addr returns the net.Addr interface which represents
 // the local multiaddr we are listening on
-func (l *OnionListener) Addr() net.Addr {
+func (l OnionListener) Addr() net.Addr {
 	netaddr, _ := manet.ToNetAddr(l.laddr)
 	return netaddr
 }
 
 // Multiaddr returns the local multiaddr we are listening on
-func (l *OnionListener) Multiaddr() ma.Multiaddr {
+func (l OnionListener) Multiaddr() ma.Multiaddr {
 	return l.laddr
 }
 
@@ -331,6 +356,11 @@ func (c *OnionConn) Transport() tpt.Transport {
 
 // LocalMultiaddr returns the local multiaddr for this connection
 func (c *OnionConn) LocalMultiaddr() ma.Multiaddr {
+	// For outbound connections, we choose not to expose any onion addresses
+	if c.laddr == nil {
+		empty, _ := ma.NewMultiaddr("")
+		return empty
+	}
 	return *c.laddr
 }
 
@@ -338,4 +368,3 @@ func (c *OnionConn) LocalMultiaddr() ma.Multiaddr {
 func (c *OnionConn) RemoteMultiaddr() ma.Multiaddr {
 	return *c.raddr
 }
-

@@ -5,34 +5,34 @@
   },
   "gxDependencies": [
     {
-      "author": "multiformats",
-      "hash": "QmXY77cVe7rVRQXZZQRioukUM7aRW3BTcAgJe12MCtb3Ji",
-      "name": "go-multiaddr",
-      "version": "1.2.4"
-    },
-    {
-      "author": "multiformats",
-      "hash": "QmX3U3YXCQ6UYBxq2LVWF8dARS1hPUTEYLrSx654Qyxyw6",
-      "name": "go-multiaddr-net",
-      "version": "1.5.5"
-    },
-    {
       "author": "whyrusleeping",
-      "hash": "QmYcK2kPkJmj9GMxKvLhD4REtAkeuaN8sqDEJePmEqHQnp",
-      "name": "go-libp2p-transport",
-      "version": "3.0.0"
-    },
-    {
-      "author": "whyrusleeping",
-      "hash": "QmZQa5J7j7kd44GGC4aKX8J9JGGzCMqwGzcEFqGV1YD57A",
+      "hash": "QmYrE8ETPuzJYQuAbPwH512wcpvATJ9vK75jUz2twKdHMo",
       "name": "mafmt",
-      "version": "1.2.3"
+      "version": "1.2.6"
     },
     {
-      "author": "Yawning Angel",
-      "hash": "QmdDmJub1b5qyQSGfVZW5HcQx1BSjQU3uRbaZtT3Z1GDMj",
+      "author": "multiformats",
+      "hash": "QmYmsdtJ3HsodkePE3eU3TsCaP2YvPZJ4LoXnNkDE5Tpt7",
+      "name": "go-multiaddr",
+      "version": "1.3.0"
+    },
+    {
+      "author": "multiformats",
+      "hash": "QmcGpxjg5xP5Jqni5hosEz3dGJuNDKvC4J49qqvfxBBHuk",
+      "name": "go-multiaddr-net",
+      "version": "1.6.2"
+    },
+    {
+      "author": "whyrusleeping",
+      "hash": "QmVMBFZqRZDA6TrQkVGGJEDSp5jC3UUMUjLcvaZ3fLCqh4",
+      "name": "go-libp2p-transport",
+      "version": "3.0.2"
+    },
+    {
+      "author": "Yawning",
+      "hash": "Qmc5fpApVsws2jdrkkr4yCdKsQ7AFHYZSmqkWWk1mW2jCL",
       "name": "bulb",
-      "version": "0.1.0"
+      "version": "1.0.0"
     }
   ],
   "gxVersion": "0.11.0",

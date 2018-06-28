@@ -1,14 +1,15 @@
 package torOnion
 
 import (
-	"testing"
-	ma "github.com/multiformats/go-multiaddr"
-	"crypto/rsa"
-	"github.com/yawning/bulb/utils/pkcs1"
-	"os"
-	"encoding/pem"
 	"crypto/rand"
+	"crypto/rsa"
+	"encoding/pem"
+	"os"
 	"path"
+	"testing"
+
+	ma "github.com/multiformats/go-multiaddr"
+	"github.com/yawning/bulb/utils/pkcs1"
 )
 
 var key string
@@ -25,7 +26,7 @@ func setup() {
 }
 
 func teardown() {
-	os.RemoveAll(path.Join("./", key + ".onion_key"))
+	os.RemoveAll(path.Join("./", key+".onion_key"))
 }
 
 func TestIsValidOnionMultiAddr(t *testing.T) {
@@ -51,7 +52,7 @@ func TestIsValidOnionMultiAddr(t *testing.T) {
 }
 
 func Test_loadKeys(t *testing.T) {
-	tpt := &OnionTransport{keysDir:"./"}
+	tpt := &OnionTransport{keysDir: "./"}
 	keys, err := tpt.loadKeys()
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +71,7 @@ func Test_loadKeys(t *testing.T) {
 	}
 }
 
-func createHiddenServiceKey() (string, error){
+func createHiddenServiceKey() (string, error) {
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
 		return "", err
@@ -80,7 +81,7 @@ func createHiddenServiceKey() (string, error){
 		return "", err
 	}
 
-	f, err := os.Create(id+".onion_key")
+	f, err := os.Create(id + ".onion_key")
 	if err != nil {
 		return "", err
 	}
