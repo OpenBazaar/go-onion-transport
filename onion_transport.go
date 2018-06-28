@@ -150,6 +150,18 @@ func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.
 	return &o, nil
 }
 
+// OnionTransportC is a type alias for OnionTransport constructors, for use
+// with libp2p.New
+type OnionTransportC func(*tptu.Upgrader) (tpt.Transport, error)
+
+// NewOnionTransportC is a convenience function that returns a function
+// suitable for passing into libp2p.Transport for host configuration
+func NewOnionTransportC(controlNet, controlAddr, controlPass string, auth *proxy.Auth, keysDir string, onlyOnion bool) OnionTransportC {
+	return func(upgrader *tptu.Upgrader) (tpt.Transport, error) {
+		return NewOnionTransport(controlNet, controlAddr, controlPass, auth, keysDir, upgrader, onlyOnion)
+	}
+}
+
 // TorDialer returns a proxy dialer gathered from the control interface.
 // This isn't needed for the IPFS transport but it provides
 // easy access to Tor for other functions.
