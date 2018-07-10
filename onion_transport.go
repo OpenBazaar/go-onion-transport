@@ -1,26 +1,25 @@
 package torOnion
 
 import (
-	"fmt"
-	"net"
-
-	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
-	tpt "github.com/libp2p/go-libp2p-transport"
-	mafmt "github.com/whyrusleeping/mafmt"
-
 	"context"
 	"crypto/rsa"
 	"encoding/base32"
 	"encoding/pem"
+	"fmt"
 	"github.com/yawning/bulb"
 	"github.com/yawning/bulb/utils/pkcs1"
 	"golang.org/x/net/proxy"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	tpt "github.com/libp2p/go-libp2p-transport"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr-net"
+	mafmt "github.com/whyrusleeping/mafmt"
 )
 
 // IsValidOnionMultiAddr is used to validate that a multiaddr
@@ -338,4 +337,3 @@ func (c *OnionConn) LocalMultiaddr() ma.Multiaddr {
 func (c *OnionConn) RemoteMultiaddr() ma.Multiaddr {
 	return *c.raddr
 }
-
