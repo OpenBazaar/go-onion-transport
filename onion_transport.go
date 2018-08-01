@@ -129,9 +129,10 @@ func (t *OnionTransport) Protocols() []int {
 	return protocols
 }
 
-// Proxy returns true, for tor is a relay-based protocol.
+// Proxy returns false since, for the time being, tor connections can't be
+// composed with other transports.
 func (t *OnionTransport) Proxy() bool {
-	return true
+	return false
 }
 
 // NewOnionTransport creates a OnionTransport
