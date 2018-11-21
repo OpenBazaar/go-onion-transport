@@ -1,4 +1,4 @@
-package torOnion
+package oniontransport
 
 import (
 	"testing"

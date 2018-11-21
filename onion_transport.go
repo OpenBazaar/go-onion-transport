@@ -1,4 +1,4 @@
-package torOnion
+package oniontransport
 
 import (
 	"context"
@@ -101,7 +101,7 @@ func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.
 		return nil, err
 	}
 	if err := conn.Authenticate(controlPass); err != nil {
-		return nil, fmt.Errorf("Authentication failed: %v", err)
+		return nil, fmt.Errorf("authentication failed: %v", err)
 	}
 	o := OnionTransport{
 		controlConn: conn,
@@ -115,6 +115,11 @@ func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.
 	}
 	o.keys = keys
 	return &o, nil
+}
+
+func (t *OnionTransport) Constructor(upgrader *tptu.Upgrader) (*OnionTransport, error) {
+	t.Upgrader = upgrader
+	return t, nil
 }
 
 // Returns a proxy dialer gathered from the control interface.
@@ -228,7 +233,7 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	// setup bulb listener
 	_, err = pkcs1.OnionAddr(&onionKey.PublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to derive onion ID: %v", err)
+		return nil, fmt.Errorf("failed to derive onion ID: %v", err)
 	}
 	listener.listener, err = t.controlConn.Listener(uint16(port), onionKey)
 	if err != nil {
