@@ -204,7 +204,7 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	// convert to net.Addr
 	netaddr, err := laddr.ValueForProtocol(ma.P_ONION)
 	if err != nil {
-
+		return nil, err
 	}
 
 	// retreive onion service virtport
@@ -228,6 +228,8 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 		port:  uint16(port),
 		key:   onionKey,
 		laddr: laddr,
+		Upgrader: t.Upgrader,
+		transport: t,
 	}
 
 	// setup bulb listener
