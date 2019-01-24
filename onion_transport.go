@@ -190,8 +190,8 @@ func (t *OnionTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID
 	}
 	onionConn := OnionConn{
 		transport: tpt.Transport(t),
-		laddr:     &t.laddr,
-		raddr:     &raddr,
+		laddr:     t.laddr,
+		raddr:     raddr,
 	}
 	if onionAddress != "" {
 		split := strings.Split(onionAddress, ":")
@@ -232,10 +232,10 @@ func (t *OnionTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	}
 
 	listener := OnionListener{
-		port:  uint16(port),
-		key:   onionKey,
-		laddr: laddr,
-		Upgrader: t.Upgrader,
+		port:      uint16(port),
+		key:       onionKey,
+		laddr:     laddr,
+		Upgrader:  t.Upgrader,
 		transport: t,
 	}
 
@@ -285,7 +285,7 @@ type OnionListener struct {
 	laddr     ma.Multiaddr
 	listener  net.Listener
 	transport tpt.Transport
-	Upgrader *tptu.Upgrader
+	Upgrader  *tptu.Upgrader
 }
 
 // Accept blocks until a connection is received returning
@@ -303,8 +303,8 @@ func (l *OnionListener) Accept() (tpt.Conn, error) {
 	onionConn := OnionConn{
 		Conn:      conn,
 		transport: l.transport,
-		laddr:     &l.laddr,
-		raddr:     &raddr,
+		laddr:     l.laddr,
+		raddr:     raddr,
 	}
 	return l.Upgrader.UpgradeInbound(context.Background(), l.transport, &onionConn)
 }
@@ -330,8 +330,8 @@ func (l *OnionListener) Multiaddr() ma.Multiaddr {
 type OnionConn struct {
 	net.Conn
 	transport tpt.Transport
-	laddr     *ma.Multiaddr
-	raddr     *ma.Multiaddr
+	laddr     ma.Multiaddr
+	raddr     ma.Multiaddr
 }
 
 // Transport returns the OnionTransport associated
@@ -342,10 +342,10 @@ func (c *OnionConn) Transport() tpt.Transport {
 
 // LocalMultiaddr returns the local multiaddr for this connection
 func (c *OnionConn) LocalMultiaddr() ma.Multiaddr {
-	return *c.laddr
+	return c.laddr
 }
 
 // RemoteMultiaddr returns the remote multiaddr for this connection
 func (c *OnionConn) RemoteMultiaddr() ma.Multiaddr {
-	return *c.raddr
+	return c.raddr
 }
