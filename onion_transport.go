@@ -108,6 +108,7 @@ func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.
 		auth:        auth,
 		keysDir:     keysDir,
 		onlyOnion:   onlyOnion,
+		Upgrader:    upgrader,
 	}
 	keys, err := o.loadKeys()
 	if err != nil {
