@@ -24,6 +24,8 @@ import (
 	"github.com/whyrusleeping/mafmt"
 )
 
+var TorDialer proxy.Dialer
+
 // IsValidOnionMultiAddr is used to validate that a multiaddr
 // is representing a Tor onion service
 func IsValidOnionMultiAddr(a ma.Multiaddr) bool {
@@ -115,6 +117,13 @@ func NewOnionTransport(controlNet, controlAddr, controlPass string, auth *proxy.
 		return nil, err
 	}
 	o.keys = keys
+
+	dialer, err := conn.Dialer(auth)
+	if err != nil {
+		return nil, err
+	}
+	TorDialer = dialer
+
 	return &o, nil
 }
 
@@ -128,17 +137,6 @@ func NewOnionTransportC(controlNet, controlAddr, controlPass string, auth *proxy
 	return func(upgrader *tptu.Upgrader) (tpt.Transport, error) {
 		return NewOnionTransport(controlNet, controlAddr, controlPass, auth, keysDir, upgrader, onlyOnion)
 	}
-}
-
-// Returns a proxy dialer gathered from the control interface.
-// This isn't needed for the IPFS transport but it provides
-// easy access to Tor for other functions.
-func (t *OnionTransport) TorDialer() (proxy.Dialer, error) {
-	dialer, err := t.controlConn.Dialer(t.auth)
-	if err != nil {
-		return nil, err
-	}
-	return dialer, nil
 }
 
 // loadKeys loads keys into our keys map from files in the keys directory
